@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>金融回撤/反弹计算器</title>
+    <style>
+        :root {
+            --primary-color: #007AFF; /* iOS Blue */
+            --secondary-color: #5AC8FA;
+            --bg-color: #F2F2F7;
+            --card-bg: #FFFFFF;
+            --text-dark: #1C1C1E;
+            --text-gray: #8E8E93;
+            --success-color: #34C759;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            background: var(--card-bg);
+            width: 100%;
+            max-width: 480px;
+            border-radius: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.05);
+            overflow: hidden;
+        }
+
+        /* 顶部导航/模式切换 */
+        .mode-toggle {
+            display: flex;
+            background: #E5E5EA;
+            padding: 4px;
+            margin: 20px 20px 0;
+            border-radius: 10px;
+        }
+
+        .toggle-btn {
+            flex: 1;
+            border: none;
+            background: none;
+            padding: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-gray);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .toggle-btn.active {
+            background: var(--card-bg);
+            color: var(--primary-color);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        /* 主要内容区 */
+        .content {
+            padding: 25px;
+        }
+
+        /* SVG 图示区域 */
+        .diagram-box {
+            height: 160px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+        
+        svg { overflow: visible; }
+        .line-path { stroke: var(--primary-color); stroke-width: 3; fill: none; stroke-linecap: round; }
+        .line-dashed { stroke: var(--secondary-color); stroke-width: 2.5; stroke-dasharray: 6, 4; fill: none; }
+        .point-marker { fill: var(--primary-color); }
+        .point-label { font-size: 16px; font-weight: 700; fill: var(--text-dark); }
+        .point-desc { font-size: 12px; fill: var(--text-gray); }
+
+        /* 输入表单 */
+        .input-group { margin-bottom: 20px; }
+        .input-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-gray);
+            margin-bottom: 8px;
+        }
+        .input-field {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            border: 2px solid #E5E5EA;
+            border-radius: 12px;
+            background: #F9F9F9;
+            box-sizing: border-box;
+            transition: border-color 0.2s;
+            font-family: 'Courier New', Courier, monospace; /* 数字用等宽字体更好看 */
+            font-weight: bold;
+        }
+        .input-field:focus {
+            border-color: var(--primary-color);
+            outline: none;
+            background: #FFF;
+        }
+
+        /* 计算按钮 */
+        .calc-btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: transform 0.1s;
+            box-shadow: 0 5px 15px rgba(0, 122, 255, 0.3);
+        }
+        .calc-btn:active { transform: scale(0.98); }
+
+        /* 结果区域 */
+        .results-area {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 2px dashed #E5E5EA;
+            display: none; /* 默认隐藏 */
+        }
+        .results-area.show { display: block; animation: slideDown 0.4s ease-out; }
+        
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .result-card {
+            background: #F0F9F4;
+            padding: 15px 20px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            border-left: 5px solid var(--success-color);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .res-title { font-size: 14px; color: var(--text-gray); font-weight: 600; }
+        .res-value { font-size: 22px; color: var(--text-dark); font-weight: 800; font-family: 'Courier New', monospace; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="mode-toggle">
+        <button class="toggle-btn active" onclick="setMode('rise')">📈 上涨测回调 (倒V)</button>
+        <button class="toggle-btn" onclick="setMode('fall')">📉 下跌测反弹 (V型)</button>
+    </div>
+
+    <div class="content">
+        <div class="diagram-box" id="diagram"></div>
+
+        <div class="input-section">
+            <div class="input-group">
+                <label class="input-label" id="labelA">A点价格 (起点):</label>
+                <input type="number" id="inputA" class="input-field" placeholder="请输入价格" step="0.01">
+            </div>
+            <div class="input-group">
+                <label class="input-label" id="labelB">B点价格 (终点):</label>
+                <input type="number" id="inputB" class="input-field" placeholder="请输入价格" step="0.01">
+            </div>
+            <button class="calc-btn" onclick="calculate(true)">开始计算目标位</button>
+        </div>
+
+        <div class="results-area" id="resultsBox">
+            <div class="result-card">
+                <div>
+                    <div class="res-title">目标位一 (几何平均)</div>
+                    <div class="res-desc" style="font-size:12px;color:#999">公式: √A×B</div>
+                </div>
+                <div class="res-value" id="val1">0.0000</div>
+            </div>
+            <div class="result-card" style="background: #F2F7FF; border-left-color: var(--primary-color);">
+                <div>
+                    <div class="res-title">目标位二 (加权系数)</div>
+                    <div class="res-desc" id="formula2Desc" style="font-size:12px;color:#999">公式: ...</div>
+                </div>
+                <div class="res-value" id="val2">0.0000</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentMode = 'rise';
+
+    // 初始化
+    window.onload = () => {
+        setMode('rise');
+        const elA = document.getElementById('inputA');
+        const elB = document.getElementById('inputB');
+
+        // 实时更新：输入变化就计算（不弹窗、不打断）
+        elA.addEventListener('input', () => calculate(false));
+        elB.addEventListener('input', () => calculate(false));
+
+        // 移动端更顺手：回车/完成也触发一次
+        elA.addEventListener('change', () => calculate(false));
+        elB.addEventListener('change', () => calculate(false));
+    };
+
+    function setMode(mode) {
+        currentMode = mode;
+        const btns = document.querySelectorAll('.toggle-btn');
+        
+        if (mode === 'rise') {
+            btns[0].classList.add('active');
+            btns[1].classList.remove('active');
+            document.getElementById('labelA').innerText = "A点价格 (起点/低点):";
+            document.getElementById('labelB').innerText = "B点价格 (高点):";
+            document.getElementById('formula2Desc').innerText = "公式: 0.749A + 0.251B";
+            renderRiseSVG();
+        } else {
+            btns[0].classList.remove('active');
+            btns[1].classList.add('active');
+            document.getElementById('labelA').innerText = "A点价格 (起点/高点):";
+            document.getElementById('labelB').innerText = "B点价格 (低点):";
+            document.getElementById('formula2Desc').innerText = "公式: 0.746A + 0.254B";
+            renderFallSVG();
+        }
+        // 切换模式时：如果输入完整就立即更新结果，否则隐藏结果
+        calculate(false);
+    }
+
+    function calculate(forceAlert = false) {
+        const aVal = document.getElementById('inputA').value;
+        const bVal = document.getElementById('inputB').value;
+        const resultsBox = document.getElementById('resultsBox');
+
+        // 实时模式：输入不完整时不弹窗，直接隐藏结果
+        if (aVal === "" || bVal === "") {
+            if (forceAlert) alert("请先输入A点和B点的价格");
+            resultsBox.classList.remove('show');
+            return;
+        }
+
+        const a = parseFloat(aVal);
+        const b = parseFloat(bVal);
+
+        // 兜底：非数值时隐藏
+        if (!isFinite(a) || !isFinite(b)) {
+            if (forceAlert) alert("请输入有效数字");
+            resultsBox.classList.remove('show');
+            return;
+        }
+
+        let c1, c2;
+
+        // 核心算法
+        c1 = Math.sqrt(a * b); // 目标一：几何平均
+
+        if (currentMode === 'rise') {
+            // 上涨测回调: A是低, B是高. 系数: 低点x0.749 + 高点x0.251
+            c2 = 0.749 * a + 0.251 * b;
+        } else {
+            // 下跌测反弹: A是高, B是低. 系数: 高点x0.746 + 低点x0.254
+            c2 = 0.746 * a + 0.254 * b;
+        }
+
+        // 显示结果（实时更新）
+        document.getElementById('val1').innerText = c1.toFixed(4);
+        document.getElementById('val2').innerText = c2.toFixed(4);
+        resultsBox.classList.add('show');
+    }
+
+    // 渲染上涨示意图 (倒V)
+    function renderRiseSVG() {
+        const svg = `
+            <svg width="260" height="140" viewBox="0 0 260 140">
+                <path d="M 40 120 L 130 30" class="line-path" />
+                <path d="M 130 30 L 180 80" class="line-dashed" />
+                <circle cx="40" cy="120" r="5" class="point-marker"/>
+                <text x="30" y="135" class="point-label" text-anchor="middle">A</text>
+                <text x="30" y="150" class="point-desc" text-anchor="middle">起点(低)</text>
+                
+                <circle cx="130" cy="30" r="5" class="point-marker"/>
+                <text x="130" y="20" class="point-label" text-anchor="middle">B</text>
+                <text x="165" y="20" class="point-desc">高点</text>
+
+                <text x="190" y="85" class="point-label" fill="var(--secondary-color)">C?</text>
+                <text x="195" y="100" class="point-desc">回调目标</text>
+            </svg>
+        `;
+        document.getElementById('diagram').innerHTML = svg;
+    }
+
+    // 渲染下跌示意图 (V型)
+    function renderFallSVG() {
+        const svg = `
+            <svg width="260" height="140" viewBox="0 0 260 140">
+                <path d="M 40 30 L 130 120" class="line-path" />
+                <path d="M 130 120 L 180 70" class="line-dashed" />
+                <circle cx="40" cy="30" r="5" class="point-marker"/>
+                <text x="30" y="35" class="point-label" text-anchor="middle">A</text>
+                <text x="30" y="50" class="point-desc" text-anchor="middle">起点(高)</text>
+                
+                <circle cx="130" cy="120" r="5" class="point-marker"/>
+                <text x="130" y="145" class="point-label" text-anchor="middle">B</text>
+                <text x="165" y="145" class="point-desc">低点</text>
+
+                <text x="190" y="75" class="point-label" fill="var(--secondary-color)">C?</text>
+                <text x="195" y="60" class="point-desc">反弹目标</text>
+            </svg>
+        `;
+        document.getElementById('diagram').innerHTML = svg;
+    }
+</script>
+
+</body>
+</html>
